@@ -1,17 +1,1 @@
-# Node.js dependencies
 node_modules/
-
-# macOS system files
-.DS_Store
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Environment variables
-.env
-
-# Optional editor folders
-.vscode/
-.idea/
