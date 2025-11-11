@@ -1,6 +1,5 @@
-const http = require('node:http');
+const http = require('http');
 const fs = require('fs');
-const path = require('path');
 const superagent = require('superagent');
 const { program } = require('commander');
 
@@ -18,44 +17,46 @@ const cacheDir = options.cache;
 fs.mkdirSync(cacheDir, { recursive: true });
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const code = url.pathname.slice(1); // "/200" -> "200"
+  const code = req.url.slice(1);
+
   if (!code) {
     res.statusCode = 404;
     res.end('Not Found');
     return;
   }
 
-  const filePath = path.join(cacheDir, `${code}.jpg`);
+  const filePath = `${cacheDir}/${code}.jpg`;
   if (req.method === 'GET') {
     try {
       const data = await fs.promises.readFile(filePath);
-      res.statusCode = 200; 
-      res.setHeader('Content-Type', 'image/jpeg'); 
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/jpeg');
       res.end(data);
+      return;
     } catch (err) {
-      if (err.code === 'ENOENT') {
-        try {
-          const response = await superagent
-            .get(`https://http.cat/${code}`)
-            .responseType('arraybuffer');
-
-          const imageBuffer = response.body;
-          await fs.promises.writeFile(filePath, imageBuffer);
-
-          res.statusCode = 200;
-          res.setHeader('Content-Type', 'image/jpeg');
-          res.end(imageBuffer);
-        } catch (e) {
-         
-          res.statusCode = 404;
-          res.end('Not Found');
-        }
-      } else {
+      if (err.code !== 'ENOENT') {
         res.statusCode = 404;
         res.end('Not Found');
+        return;
       }
     }
+
+    try {
+      const response = await superagent
+        .get(`https://http.cat/${code}`)
+        .responseType('arraybuffer');
+
+      const imageBuffer = response.body;
+      await fs.promises.writeFile(filePath, imageBuffer);
+
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.end(imageBuffer);
+    } catch (err) {
+      res.statusCode = 404;
+      res.end('Not Found');
+    }
+
     return;
   }
 
@@ -68,6 +69,7 @@ const server = http.createServer(async (req, res) => {
 
     req.on('end', async () => {
       const body = Buffer.concat(chunks);
+
       try {
         await fs.promises.writeFile(filePath, body);
         res.statusCode = 201;
@@ -87,12 +89,11 @@ const server = http.createServer(async (req, res) => {
       res.statusCode = 200;
       res.end('Deleted');
     } catch (err) {
-      res.statusCode = 404; 
+      res.statusCode = 404;
       res.end('Not Found');
     }
     return;
   }
-
   res.statusCode = 405;
   res.end('Method not allowed');
 });
